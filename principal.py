@@ -179,6 +179,7 @@ st.download_button(
     file_name="dataset.csv",
     mime="text/csv"
 )
+
 # ================================================
 # Árbol de Decisión
 # ================================================
@@ -189,6 +190,9 @@ from sklearn.metrics import classification_report, accuracy_score
 st.subheader("🌳 Árbol de Decisión")
 
 if df is not None:
+    # Definir columna objetivo
+    target_col = "Target"
+
     # Separar features y target
     X = df.drop(columns=[target_col])
     y = df[target_col]
