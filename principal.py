@@ -5,7 +5,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor, plot_tree
 import pandas as pd
 import numpy as np
 import seaborn as sns
@@ -22,19 +23,33 @@ n_features = st.sidebar.slider("Número de características", 2, 20, 5)
 n_informative = st.sidebar.slider("Características informativas", 1, n_features, 3)
 random_state = st.sidebar.number_input("Random seed", 0, 9999, 42)
 
-# --- Generar datos ---
-X, y = make_classification(
-    n_samples=n_samples,
-    n_features=n_features,
-    n_informative=n_informative,
-    n_redundant=0,
-    n_classes=2,
-    random_state=random_state,
-)
+# --- Cargar CSV personalizado ---
+st.sidebar.header("Importar Dataset")
+uploaded_file = st.sidebar.file_uploader("Sube tu archivo CSV", type=["csv"])
 
-df = pd.DataFrame(X, columns=[f"Feature_{i}" for i in range(X.shape[1])])
-df["Target"] = y
+use_custom_data = False
+if uploaded_file is not None:
+    try:
+        df = pd.read_csv(uploaded_file)
+        st.success("✅ Dataset cargado exitosamente.")
+        use_custom_data = True
+    except Exception as e:
+        st.error(f"❌ Error al leer el archivo: {e}")
 
+# --- Generar datos si no se subió un CSV ---
+if not use_custom_data:
+    X, y = make_classification(
+        n_samples=n_samples,
+        n_features=n_features,
+        n_informative=n_informative,
+        n_redundant=0,
+        n_classes=2,
+        random_state=random_state,
+    )
+    df = pd.DataFrame(X, columns=[f"Feature_{i}" for i in range(X.shape[1])])
+    df["Target"] = y
+
+# --- Vista previa ---
 st.subheader("Vista previa del Dataset")
 st.dataframe(df.head())
 
@@ -126,7 +141,7 @@ if st.checkbox("🧰 Mostrar boxplot por clase objetivo"):
 # --- Distribución de la variable objetivo ---
 if st.checkbox("🧮 Mostrar distribución de clases"):
     st.write("Distribución de la variable objetivo:")
-    class_counts = df["Target"].value_counts().rename(index={0: "Clase 0", 1: "Clase 1"})
+    class_counts = df["Target"].value_counts()
     st.bar_chart(class_counts)
 
 # --- Mapa de calor de correlaciones ---
@@ -146,32 +161,6 @@ if st.checkbox("📌 Mostrar scatterplot entre dos características"):
     ax_scatter.set_title(f"{col1} vs {col2} por clase objetivo")
     st.pyplot(fig_scatter)
 
-# --- Cargar CSV personalizado ---
-st.sidebar.header("Importar Dataset")
-uploaded_file = st.sidebar.file_uploader("Sube tu archivo CSV", type=["csv"])
-
-use_custom_data = False
-if uploaded_file is not None:
-    try:
-        df = pd.read_csv(uploaded_file)
-        st.success("✅ Dataset cargado exitosamente.")
-        use_custom_data = True
-    except Exception as e:
-        st.error(f"❌ Error al leer el archivo: {e}")
-
-# --- Generar datos si no se subió un CSV ---
-if not use_custom_data:
-    X, y = make_classification(
-        n_samples=n_samples,
-        n_features=n_features,
-        n_informative=n_informative,
-        n_redundant=0,
-        n_classes=2,
-        random_state=random_state,
-    )
-    df = pd.DataFrame(X, columns=[f"Feature_{i}" for i in range(X.shape[1])])
-    df["Target"] = y
-
 # --- Descargar dataset ---
 st.download_button(
     label="⬇️ Descargar Dataset como CSV",
@@ -181,52 +170,60 @@ st.download_button(
 )
 
 # ================================================
-# Árbol de Decisión
+# 🌳 Árbol de Decisión
 # ================================================
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import classification_report, accuracy_score
-
 st.subheader("🌳 Árbol de Decisión")
 
-if df is not None:
-    # Definir columna objetivo
-    target_col = st.selectbox("Selecciona la columna objetivo para el árbol", df.columns)
+target_col = st.selectbox("Selecciona la columna objetivo para el árbol", df.columns)
 
-    # Separar features y target
-    X = df.drop(columns=[target_col])
-    y = df[target_col]
+X_tree = df.drop(columns=[target_col])
+y_tree = df[target_col]
 
-    # Split entrenamiento / prueba
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# Detectar si es clasificación o regresión
+if y_tree.dtype == "object" or len(np.unique(y_tree)) <= 10:
+    is_classification = True
+else:
+    is_classification = False
 
-    # Parámetros ajustables en la barra lateral
-    st.sidebar.subheader("⚙️ Parámetros del Árbol de Decisión")
-    max_depth = st.sidebar.slider("Profundidad máxima", 1, 20, 3)
-    min_samples_split = st.sidebar.slider("Mínimo de muestras para dividir", 2, 20, 2)
+# Parámetros ajustables en la barra lateral
+st.sidebar.subheader("⚙️ Parámetros del Árbol de Decisión")
+max_depth = st.sidebar.slider("Profundidad máxima", 1, 20, 3)
+min_samples_split = st.sidebar.slider("Mínimo de muestras para dividir", 2, 20, 2)
+
+if is_classification:
     criterion = st.sidebar.selectbox("Criterio de impureza", ["gini", "entropy", "log_loss"])
-
-    # Entrenar modelo
     clf = DecisionTreeClassifier(
         max_depth=max_depth,
         min_samples_split=min_samples_split,
         criterion=criterion,
         random_state=42
     )
-    clf.fit(X_train, y_train)
-
-    # Predicciones
-    y_pred = clf.predict(X_test)
-
-    # Mostrar métricas
-    st.write("**Accuracy:**", accuracy_score(y_test, y_pred))
-    st.text("Reporte de clasificación:")
-    st.text(classification_report(y_test, y_pred))
-
-    # Graficar el árbol
-    st.write("### Visualización del Árbol")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    plot_tree(clf, feature_names=X.columns, class_names=[str(c) for c in clf.classes_], filled=True, fontsize=8, ax=ax)
-    st.pyplot(fig)
 else:
-    st.info("📂 Carga un dataset válido para entrenar el Árbol de Decisión.")
+    criterion = st.sidebar.selectbox("Criterio de regresión", ["squared_error", "friedman_mse", "absolute_error", "poisson"])
+    clf = DecisionTreeRegressor(
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        criterion=criterion,
+        random_state=42
+    )
+
+# Entrenar modelo
+X_train_tree, X_test_tree, y_train_tree, y_test_tree = train_test_split(X_tree, y_tree, test_size=0.3, random_state=42)
+clf.fit(X_train_tree, y_train_tree)
+
+# Predicciones
+y_pred_tree = clf.predict(X_test_tree)
+
+# Mostrar métricas
+if is_classification:
+    st.write("**Accuracy:**", accuracy_score(y_test_tree, y_pred_tree))
+    st.text("Reporte de clasificación:")
+    st.text(classification_report(y_test_tree, y_pred_tree))
+else:
+    st.write("**MSE (Error cuadrático medio):**", np.mean((y_test_tree - y_pred_tree) ** 2))
+
+# Graficar el árbol
+st.write("### Visualización del Árbol")
+fig, ax = plt.subplots(figsize=(12, 6))
+plot_tree(clf, feature_names=X_tree.columns, filled=True, fontsize=8, ax=ax)
+st.pyplot(fig)
