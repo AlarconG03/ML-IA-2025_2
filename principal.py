@@ -179,3 +179,50 @@ st.download_button(
     file_name="dataset.csv",
     mime="text/csv"
 )
+# ================================================
+# Árbol de Decisión
+# ================================================
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report, accuracy_score
+
+st.subheader("🌳 Árbol de Decisión")
+
+if df is not None:
+    # Separar features y target
+    X = df.drop(columns=[target_col])
+    y = df[target_col]
+
+    # Split entrenamiento / prueba
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+    # Parámetros ajustables en la barra lateral
+    st.sidebar.subheader("⚙️ Parámetros del Árbol de Decisión")
+    max_depth = st.sidebar.slider("Profundidad máxima", 1, 20, 3)
+    min_samples_split = st.sidebar.slider("Mínimo de muestras para dividir", 2, 20, 2)
+    criterion = st.sidebar.selectbox("Criterio de impureza", ["gini", "entropy", "log_loss"])
+
+    # Entrenar modelo
+    clf = DecisionTreeClassifier(
+        max_depth=max_depth,
+        min_samples_split=min_samples_split,
+        criterion=criterion,
+        random_state=42
+    )
+    clf.fit(X_train, y_train)
+
+    # Predicciones
+    y_pred = clf.predict(X_test)
+
+    # Mostrar métricas
+    st.write("**Accuracy:**", accuracy_score(y_test, y_pred))
+    st.text("Reporte de clasificación:")
+    st.text(classification_report(y_test, y_pred))
+
+    # Graficar el árbol
+    st.write("### Visualización del Árbol")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    plot_tree(clf, feature_names=X.columns, class_names=[str(c) for c in clf.classes_], filled=True, fontsize=8, ax=ax)
+    st.pyplot(fig)
+else:
+    st.info("📂 Carga un dataset válido para entrenar el Árbol de Decisión.")
