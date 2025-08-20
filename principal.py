@@ -191,7 +191,7 @@ st.subheader("🌳 Árbol de Decisión")
 
 if df is not None:
     # Definir columna objetivo
-    target_col = "Target"
+    target_col = st.selectbox("Selecciona la columna objetivo para el árbol", df.columns)
 
     # Separar features y target
     X = df.drop(columns=[target_col])
